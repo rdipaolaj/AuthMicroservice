@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" Version="11.9.2" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.9.2" />
+    <PackageReference Include="MediatR" Version="12.4.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ssptb.pe.tdlt.auth.api.secretsmanager\ssptb.pe.tdlt.auth.api.secretsmanager.csproj" />
+    <ProjectReference Include="..\ssptb.pe.tdlt.auth.commandhandler\ssptb.pe.tdlt.auth.commandhandler.csproj" />
+    <ProjectReference Include="..\ssptb.pe.tdlt.auth.common\ssptb.pe.tdlt.auth.common.csproj" />
+    <ProjectReference Include="..\ssptb.pe.tdlt.auth.internalservices\ssptb.pe.tdlt.auth.internalservices.csproj" />
+    <ProjectReference Include="..\ssptb.pe.tdlt.auth.jwt\ssptb.pe.tdlt.auth.jwt.csproj" />
+    <ProjectReference Include="..\ssptb.pe.tdlt.auth.redis\ssptb.pe.tdlt.auth.redis.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mapster" Version="7.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ssptb.pe.tdlt.auth.common\ssptb.pe.tdlt.auth.common.csproj" />
+    <ProjectReference Include="..\ssptb.pe.tdlt.auth.entities\ssptb.pe.tdlt.auth.entities.csproj" />
+  </ItemGroup>
+
+</Project>
