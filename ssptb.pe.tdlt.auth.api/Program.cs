@@ -26,6 +26,7 @@ builder.Services.AddMapsterConfiguration();
 builder.Services.AddApiVersioningConfiguration();
 
 builder.Services.AddDatabaseConfiguration(builder.Configuration);
+builder.Services.AddDataServicesConfiguration();
 
 var app = builder.Build();
 

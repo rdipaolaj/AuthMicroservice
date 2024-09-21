@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using ssptb.pe.tdlt.auth.common.Settings;
+using ssptb.pe.tdlt.auth.data.Validations.Auth;
+using ssptb.pe.tdlt.auth.data.Validations.Auth.Service;
 
 namespace ssptb.pe.tdlt.auth.data;
 public static class DataConfiguration
@@ -24,6 +26,14 @@ public static class DataConfiguration
         services.AddDbContext<ApplicationDbContext>(options =>
             options.UseNpgsql(connectionString)
         );
+
+        return services;
+    }
+
+    public static IServiceCollection AddDataServicesConfiguration(this IServiceCollection services)
+    {
+        services.AddScoped<IPasswordValidator, Argon2PasswordValidator>();
+        services.AddScoped<IAuthUserRepository, AuthUserRepository>();
 
         return services;
     }

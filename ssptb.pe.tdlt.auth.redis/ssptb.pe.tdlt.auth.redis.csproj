@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ssptb.pe.tdlt.auth.common\ssptb.pe.tdlt.auth.common.csproj" />
+    <ProjectReference Include="..\ssptb.pe.tdlt.auth.dto\ssptb.pe.tdlt.auth.dto.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using ssptb.pe.tdlt.auth.internalservices.Base;
+using ssptb.pe.tdlt.auth.internalservices.RolePermission;
 using ssptb.pe.tdlt.auth.internalservices.User;
 
 namespace ssptb.pe.tdlt.auth.internalservices;
@@ -9,6 +10,7 @@ public static class InternalServicesConfiguration
     {
         services.AddTransient<IBaseService, BaseService>();
         services.AddTransient<IUserDataService, UserDataService>();
+        services.AddTransient<IRolePermissionService, RolePermissionService>();
 
         return services;
     }

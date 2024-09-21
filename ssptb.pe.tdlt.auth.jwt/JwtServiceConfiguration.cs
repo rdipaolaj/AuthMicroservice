@@ -21,6 +21,7 @@ public static class JwtServiceConfiguration
     public static IServiceCollection AddJWTServiceConfiguration(this IServiceCollection services)
     {
         services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
+        services.AddSingleton<IJwtTokenService, JwtTokenService>();
 
         return services;
     }

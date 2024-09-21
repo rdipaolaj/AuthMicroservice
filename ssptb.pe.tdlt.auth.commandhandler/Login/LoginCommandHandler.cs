@@ -1,123 +1,159 @@
-﻿using Konscious.Security.Cryptography;
-using MediatR;
+﻿using MediatR;
 using Microsoft.Extensions.Logging;
 using ssptb.pe.tdlt.auth.command.Login;
 using ssptb.pe.tdlt.auth.common.Responses;
-using ssptb.pe.tdlt.auth.data;
+using ssptb.pe.tdlt.auth.data.Validations.Auth.Service;
+using ssptb.pe.tdlt.auth.data.Validations.Auth;
 using ssptb.pe.tdlt.auth.dto.Login;
-using ssptb.pe.tdlt.auth.dto.User;
 using ssptb.pe.tdlt.auth.dto.User.Requests;
 using ssptb.pe.tdlt.auth.entities;
 using ssptb.pe.tdlt.auth.internalservices.User;
 using ssptb.pe.tdlt.auth.jwt.Services;
-using ssptb.pe.tdlt.auth.redis.Services;
-using System.Text;
+using ssptb.pe.tdlt.auth.redis.UserCache;
+using ssptb.pe.tdlt.auth.dto.User;
+using ssptb.pe.tdlt.auth.internalservices.RolePermission;
+using ssptb.pe.tdlt.auth.dto.RolePermission;
 
 namespace ssptb.pe.tdlt.auth.commandhandler.Login;
 public class LoginCommandHandler : IRequestHandler<LoginCommand, ApiResponse<AuthUserResponse>>
 {
-    private readonly ApplicationDbContext _context;
-    private readonly IRedisService _redisService;
     private readonly ILogger<LoginCommandHandler> _logger;
-    private readonly IJwtTokenGenerator _tokenGenerator;
+    private readonly IUserCacheService _userCacheService;
     private readonly IUserDataService _userDataService;
+    private readonly IPasswordValidator _passwordValidator;
+    private readonly IJwtTokenService _jwtTokenService;
+    private readonly IAuthUserRepository _authUserRepository;
+    private readonly IRolePermissionService _rolePermissionService;
 
-    public LoginCommandHandler(ApplicationDbContext context, IRedisService redisService, ILogger<LoginCommandHandler> logger, IJwtTokenGenerator tokenGenerator, IUserDataService userDataService)
+    public LoginCommandHandler(
+        ILogger<LoginCommandHandler> logger,
+        IUserCacheService userCacheService,
+        IUserDataService userDataService,
+        IPasswordValidator passwordValidator,
+        IJwtTokenService jwtTokenService,
+        IAuthUserRepository authUserRepository,
+        IRolePermissionService rolePermissionService)
     {
-        _context = context;
-        _redisService = redisService;
         _logger = logger;
-        _tokenGenerator = tokenGenerator;
+        _userCacheService = userCacheService;
         _userDataService = userDataService;
+        _passwordValidator = passwordValidator;
+        _jwtTokenService = jwtTokenService;
+        _authUserRepository = authUserRepository;
+        _rolePermissionService = rolePermissionService;
     }
 
     public async Task<ApiResponse<AuthUserResponse>> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Attempting to authenticate user...");
 
-        // Buscar el usuario en Redis
-        var redisKey = $"user:{request.Username}";
-        var user = await _redisService.GetInformationAsync<GetUserByUsernameResponse>(redisKey);
+        var user = await GetUserFromCacheOrServiceAsync(request.Username);
 
         if (user == null)
-        {
-            _logger.LogInformation("Usuario no encontrado en Redis, buscando en el microservicio de usuario...");
-
-            // Crear el request para el servicio de usuario
-            var getUserRequest = new GetUserByUsernameRequest
-            {
-                Username = request.Username
-            };
-
-            // Llamar al microservicio de usuario si no está en Redis
-            var userResponse = await _userDataService.GetUserDataClient(getUserRequest);
-
-            if (!userResponse.Success)
-            {
-                return ApiResponseHelper.CreateErrorResponse<AuthUserResponse>("Invalid username or password");
-            }
-
-            user = new GetUserByUsernameResponse
-            {
-                UserId = userResponse.Data.UserId,
-                Username = userResponse.Data.Username,
-                HashedPassword = userResponse.Data.HashedPassword,
-                SaltPassword = userResponse.Data.SaltPassword,
-                Email = userResponse.Data.Email,
-                PhoneNumber = userResponse.Data.PhoneNumber,
-                UserRole = userResponse.Data.UserRole,
-                CompanyName = userResponse.Data.CompanyName,
-                Department = userResponse.Data.Department,
-                JobTitle = userResponse.Data.JobTitle,
-                CreatedAt = userResponse.Data.CreatedAt,
-                LastLogin = userResponse.Data.LastLogin,
-                AccountStatus = userResponse.Data.AccountStatus
-            };
-
-            // Guardar la información del usuario en Redis para futuras solicitudes
-            await _redisService.SaveInformationAsJsonAsync(redisKey, user, TimeSpan.FromHours(1));
-        }
-
-        AuthUser authUser = new AuthUser();
-
-        // Validar la contraseña usando Argon2
-        var argon2 = new Argon2id(Encoding.UTF8.GetBytes(request.Password))
-        {
-            Salt = Convert.FromBase64String(user.SaltPassword), // El salt debería estar almacenado junto con la contraseña
-            DegreeOfParallelism = 8,
-            MemorySize = 8192,
-            Iterations = 4
-        };
-
-        var hashedInputPassword = Convert.ToBase64String(argon2.GetBytes(16));
-        if (hashedInputPassword != user.HashedPassword)
         {
             return ApiResponseHelper.CreateErrorResponse<AuthUserResponse>("Invalid username or password");
         }
 
-        // Generar el token JWT
-        var jwtToken = _tokenGenerator.GenerateToken(user);
-
-        // Actualizar la última fecha de acceso y almacenar el token JWT
-        authUser.LastLogin = DateTime.UtcNow;
-        authUser.Username = user.Username;
-        authUser.JwtToken = jwtToken;
-        authUser.TokenExpiry = DateTime.UtcNow.AddHours(1); // El token expira en 1 hora
-
-        _context.AuthUsers.Add(authUser);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        // Guardar la información actualizada en Redis
-        await _redisService.SaveInformationAsJsonAsync(redisKey, user, TimeSpan.FromHours(1));
-
-        // Preparar la respuesta
-        var response = new AuthUserResponse
+        if (!ValidatePassword(request.Password, user.HashedPassword, user.SaltPassword))
         {
-            Username = authUser.Username,
-            JwtToken = jwtToken,
-            TokenExpiry = authUser.TokenExpiry
+            return ApiResponseHelper.CreateErrorResponse<AuthUserResponse>("Invalid username or password");
+        }
+
+        var jwtToken = _jwtTokenService.GenerateToken(user);
+
+        var authUser = await UpdateAuthUserAsync(user.Username, jwtToken.Token, jwtToken.Expiry, cancellationToken);
+
+        await UpdateUserCacheAsync(user, authUser.LastLogin);
+
+        var response = PrepareResponse(authUser, user.Permissions);
+
+        _logger.LogInformation("Usuario autenticado exitosamente: {Username}", request.Username);
+        return ApiResponseHelper.CreateSuccessResponse(response, "User authenticated successfully");
+    }
+
+    private async Task<GetUserByUsernameResponse> GetUserFromCacheOrServiceAsync(string username)
+    {
+        var user = await _userCacheService.GetUserByUsernameAsync(username);
+        if (user == null)
+        {
+            _logger.LogInformation("Usuario no encontrado en Redis, buscando en el microservicio de usuario...");
+
+            var userResponse = await _userDataService.GetUserDataClient(new GetUserByUsernameRequest
+            {
+                Username = username
+            });
+
+            if (userResponse.Success)
+            {
+                user = userResponse.Data;
+
+                // Obtener los permisos del usuario basado en su RoleId usando el nuevo método
+                user.Permissions = await GetPermissionsByRoleIdAsync(user.RoleId);
+
+                await _userCacheService.SaveUserAsync(user, TimeSpan.FromHours(1));
+            }
+        }
+        else
+        {
+            // Si el usuario está en el caché, obtener los permisos también
+            user.Permissions = await GetPermissionsByRoleIdAsync(user.RoleId);
+        }
+
+        return user;
+    }
+
+    // Método reutilizable para obtener los permisos de un RoleId
+    private async Task<List<PermissionDto>> GetPermissionsByRoleIdAsync(Guid roleId)
+    {
+        var permissionsResponse = await _rolePermissionService.GetPermissionsByRoleIdAsync(new GetRolePermissionByRoleIdRequest
+        {
+            RoleId = roleId
+        });
+
+        if (permissionsResponse.Success)
+        {
+            return permissionsResponse.Data.Permissions;
+        }
+
+        _logger.LogWarning($"No se pudieron obtener los permisos para el Role ID {roleId}");
+        return new List<PermissionDto>(); // Retornar una lista vacía si no se pueden obtener los permisos
+    }
+
+    private bool ValidatePassword(string inputPassword, string storedHashedPassword, string salt)
+    {
+        return _passwordValidator.ValidatePassword(inputPassword, storedHashedPassword, salt);
+    }
+
+    private async Task<AuthUser> UpdateAuthUserAsync(string username, string token, DateTime tokenExpiry, CancellationToken cancellationToken)
+    {
+        var authUser = new AuthUser
+        {
+            Username = username,
+            JwtToken = token,
+            TokenExpiry = tokenExpiry,
+            LastLogin = DateTime.UtcNow
         };
 
-        return ApiResponseHelper.CreateSuccessResponse(response, "User authenticated successfully");
+        await _authUserRepository.AddAuthUserAsync(authUser);
+        await _authUserRepository.SaveChangesAsync(cancellationToken);
+
+        return authUser;
+    }
+
+    private async Task UpdateUserCacheAsync(GetUserByUsernameResponse user, DateTime lastLogin)
+    {
+        user.LastLogin = lastLogin;
+        await _userCacheService.SaveUserAsync(user, TimeSpan.FromHours(1));
+    }
+
+    private AuthUserResponse PrepareResponse(AuthUser authUser, List<PermissionDto> permissions)
+    {
+        return new AuthUserResponse
+        {
+            Username = authUser.Username,
+            JwtToken = authUser.JwtToken,
+            TokenExpiry = authUser.TokenExpiry,
+            Permissions = permissions // Incluye los permisos en la respuesta
+        };
     }
 }

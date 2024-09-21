@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using ssptb.pe.tdlt.auth.redis.Services;
+using ssptb.pe.tdlt.auth.redis.UserCache;
 
 namespace ssptb.pe.tdlt.auth.redis;
 
@@ -16,6 +17,7 @@ public static class RedisServiceConfiguration
     public static IServiceCollection AddRedisServiceConfiguration(this IServiceCollection services)
     {
         services.AddSingleton<IRedisService, RedisService>();
+        services.AddSingleton<IUserCacheService, UserCacheService>();
 
         return services;
     }
