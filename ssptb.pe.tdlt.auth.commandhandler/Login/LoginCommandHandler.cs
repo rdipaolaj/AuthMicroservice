@@ -65,7 +65,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, ApiResponse<Aut
 
         await UpdateUserCacheAsync(user, authUser.LastLogin);
 
-        var response = PrepareResponse(authUser, user.Permissions);
+        var response = PrepareResponse(authUser, user.Permissions, user.UserId, user.RoleId);
 
         _logger.LogInformation("Usuario autenticado exitosamente: {Username}", request.Username);
         return ApiResponseHelper.CreateSuccessResponse(response, "User authenticated successfully");
@@ -146,11 +146,13 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, ApiResponse<Aut
         await _userCacheService.SaveUserAsync(user, TimeSpan.FromHours(1));
     }
 
-    private AuthUserResponse PrepareResponse(AuthUser authUser, List<PermissionDto> permissions)
+    private AuthUserResponse PrepareResponse(AuthUser authUser, List<PermissionDto> permissions, Guid userId, Guid rolId)
     {
         return new AuthUserResponse
         {
             Username = authUser.Username,
+            UserId = userId,
+            RolId = rolId,
             JwtToken = authUser.JwtToken,
             TokenExpiry = authUser.TokenExpiry,
             Permissions = permissions // Incluye los permisos en la respuesta
