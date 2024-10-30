@@ -20,11 +20,15 @@ public static class DataConfiguration
             throw new InvalidOperationException("PostgresDbSettings not configured properly.");
         }
 
-        var connectionString = $"Host={postgresSettings.Host};Port={postgresSettings.Port};Username={postgresSettings.Engine};Password={postgresSettings.Password};Database={postgresSettings.Dbname};";
+        var connectionString = $"Host={postgresSettings.Host};Port={postgresSettings.Port};Username={postgresSettings.Username};Password={postgresSettings.Password};Database={postgresSettings.Dbname};";
 
         // Configura el DbContext con la cadena de conexión de PostgreSQL
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseNpgsql(connectionString)
+            options.UseNpgsql(connectionString, npgsqlOptions =>
+            {
+                npgsqlOptions.CommandTimeout(30); // Ajusta el tiempo de espera si es necesario
+                npgsqlOptions.MigrationsHistoryTable("__EFMigrationsHistory", "authdb"); // Forzar la tabla de migración en `authdb`
+            })
         );
 
         return services;

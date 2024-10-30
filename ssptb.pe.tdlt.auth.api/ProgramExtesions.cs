@@ -74,7 +74,7 @@ public static class ProgramExtesions
             options.Engine = secretsPostgres.Engine;
             options.Host = secretsPostgres.Host;
             options.Port = secretsPostgres.Port;
-            options.Dbname = "authdb";
+            options.Dbname = "postgres";
             options.DbInstanceIdentifier = secretsPostgres.DbInstanceIdentifier;
         });
 

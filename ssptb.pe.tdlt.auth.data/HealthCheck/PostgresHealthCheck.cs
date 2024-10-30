@@ -24,9 +24,11 @@ public class PostgresHealthCheck : IHealthCheck
             return HealthCheckResult.Unhealthy("PostgresDbSettings is not configured.");
         }
 
+        // Crea la cadena de conexión usando los valores configurados en _postgresSettings
+        var connectionString = $"Host={_postgresSettings.Host};Port={_postgresSettings.Port};Username={_postgresSettings.Username};Password={_postgresSettings.Password};Database={_postgresSettings.Dbname};";
+
         try
         {
-            var connectionString = $"Host={_postgresSettings.Host};Port={_postgresSettings.Port};Username={_postgresSettings.Engine};Password={_postgresSettings.Password};Database={_postgresSettings.Dbname};";
             await using var connection = new NpgsqlConnection(connectionString);
             await connection.OpenAsync(cancellationToken);
             _logger.LogInformation("Connection to PostgreSQL database was successful.");
