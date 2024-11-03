@@ -11,8 +11,12 @@ namespace ssptb.pe.tdlt.auth.data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.EnsureSchema(
+                name: "authdb");
+
             migrationBuilder.CreateTable(
                 name: "AuthUsers",
+                schema: "authdb",
                 columns: table => new
                 {
                     AuthUserId = table.Column<Guid>(type: "uuid", nullable: false),
@@ -33,7 +37,8 @@ namespace ssptb.pe.tdlt.auth.data.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "AuthUsers");
+                name: "AuthUsers",
+                schema: "authdb");
         }
     }
 }

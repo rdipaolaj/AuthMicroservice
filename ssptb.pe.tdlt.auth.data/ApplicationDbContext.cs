@@ -9,6 +9,14 @@ public class ApplicationDbContext : DbContext
     {
     }
 
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // Especifica el esquema predeterminado
+        modelBuilder.HasDefaultSchema("authdb");
+
+        base.OnModelCreating(modelBuilder);
+    }
+
     // Definir DbSets
     public DbSet<AuthUser> AuthUsers { get; set; }
 }

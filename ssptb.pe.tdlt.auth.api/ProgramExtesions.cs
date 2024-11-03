@@ -60,6 +60,7 @@ public static class ProgramExtesions
 
         AuthSecrets secretsAuth = secretManagerService.GetAuthSecrets().GetAwaiter().GetResult();
         PostgresDbSecrets secretsPostgres = secretManagerService.GetPostgresDbSecrets().GetAwaiter().GetResult();
+        RedisSecrets redisSecrets = secretManagerService.GetRedisSecrets().GetAwaiter().GetResult();
 
         services.Configure<AuthSettings>(options =>
         {
@@ -73,8 +74,13 @@ public static class ProgramExtesions
             options.Engine = secretsPostgres.Engine;
             options.Host = secretsPostgres.Host;
             options.Port = secretsPostgres.Port;
-            options.Dbname = "authdb";
+            options.Dbname = "postgres";
             options.DbInstanceIdentifier = secretsPostgres.DbInstanceIdentifier;
+        });
+
+        services.Configure<RedisKeySettings>(options =>
+        {
+            options.PrivateKey = redisSecrets.PrivateKey;
         });
 
         return services;

@@ -13,6 +13,7 @@ using ssptb.pe.tdlt.auth.redis.UserCache;
 using ssptb.pe.tdlt.auth.dto.User;
 using ssptb.pe.tdlt.auth.internalservices.RolePermission;
 using ssptb.pe.tdlt.auth.dto.RolePermission;
+using StackExchange.Redis;
 
 namespace ssptb.pe.tdlt.auth.commandhandler.Login;
 public class LoginCommandHandler : IRequestHandler<LoginCommand, ApiResponse<AuthUserResponse>>
@@ -65,7 +66,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, ApiResponse<Aut
 
         await UpdateUserCacheAsync(user, authUser.LastLogin);
 
-        var response = PrepareResponse(authUser, user.Permissions);
+        var response = PrepareResponse(authUser, user.Permissions, user.UserId, user.RoleId);
 
         _logger.LogInformation("Usuario autenticado exitosamente: {Username}", request.Username);
         return ApiResponseHelper.CreateSuccessResponse(response, "User authenticated successfully");
@@ -73,7 +74,15 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, ApiResponse<Aut
 
     private async Task<GetUserByUsernameResponse> GetUserFromCacheOrServiceAsync(string username)
     {
-        var user = await _userCacheService.GetUserByUsernameAsync(username);
+        GetUserByUsernameResponse user = null;
+        try
+        {
+            user = await _userCacheService.GetUserByUsernameAsync(username);
+        }
+        catch (RedisConnectionException ex)
+        {
+            _logger.LogWarning("Failed to connect to Redis. Error: {Message}", ex.Message);
+        }
         if (user == null)
         {
             _logger.LogInformation("Usuario no encontrado en Redis, buscando en el microservicio de usuario...");
@@ -90,7 +99,14 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, ApiResponse<Aut
                 // Obtener los permisos del usuario basado en su RoleId usando el nuevo método
                 user.Permissions = await GetPermissionsByRoleIdAsync(user.RoleId);
 
-                await _userCacheService.SaveUserAsync(user, TimeSpan.FromHours(1));
+                try
+                {
+                    await _userCacheService.SaveUserAsync(user, TimeSpan.FromHours(1));
+                }
+                catch (RedisConnectionException ex)
+                {
+                    _logger.LogWarning("Could not save user data to Redis. Error: {Message}", ex.Message);
+                }
             }
         }
         else
@@ -143,14 +159,23 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, ApiResponse<Aut
     private async Task UpdateUserCacheAsync(GetUserByUsernameResponse user, DateTime lastLogin)
     {
         user.LastLogin = lastLogin;
-        await _userCacheService.SaveUserAsync(user, TimeSpan.FromHours(1));
+        try
+        {
+            await _userCacheService.SaveUserAsync(user, TimeSpan.FromHours(1));
+        }
+        catch (RedisConnectionException ex)
+        {
+            _logger.LogWarning("Unable to update user cache in Redis. Error: {Message}", ex.Message);
+        }
     }
 
-    private AuthUserResponse PrepareResponse(AuthUser authUser, List<PermissionDto> permissions)
+    private AuthUserResponse PrepareResponse(AuthUser authUser, List<PermissionDto> permissions, Guid userId, Guid rolId)
     {
         return new AuthUserResponse
         {
             Username = authUser.Username,
+            UserId = userId,
+            RolId = rolId,
             JwtToken = authUser.JwtToken,
             TokenExpiry = authUser.TokenExpiry,
             Permissions = permissions // Incluye los permisos en la respuesta

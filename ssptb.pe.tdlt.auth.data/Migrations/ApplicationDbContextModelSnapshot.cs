@@ -17,6 +17,7 @@ namespace ssptb.pe.tdlt.auth.data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
+                .HasDefaultSchema("authdb")
                 .HasAnnotation("ProductVersion", "8.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
@@ -51,7 +52,7 @@ namespace ssptb.pe.tdlt.auth.data.Migrations
 
                     b.HasKey("AuthUserId");
 
-                    b.ToTable("AuthUsers");
+                    b.ToTable("AuthUsers", "authdb");
                 });
 #pragma warning restore 612, 618
         }
